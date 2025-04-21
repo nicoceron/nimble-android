@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">Nimble</string>
+
+    <string name="error_user_id_not_found">Error: User ID not found.</string>
+    <string name="info_no_tasks_found">No tasks found.</string>
+    <string name="error_loading_tasks">Error loading tasks.</string>
+    <string name="error_generic_prefix">Error: %s</string>
+    <string name="dialog_title_create_task">Create New Task</string>
+    <string name="dialog_button_create">Create</string>
+    <string name="dialog_button_cancel">Cancel</string>
+    <string name="success_task_created">Task \'%s\' created</string>
+    <string name="error_task_create_failed_null">Failed to create task (null response)</string>
+    <string name="error_creating_task_prefix">Error creating task: %s</string>
+    <string name="error_delete_invalid_id">Cannot delete task with invalid ID</string>
+    <string name="dialog_title_delete_task">Delete Task</string>
+    <string name="dialog_message_delete_confirm">Are you sure you want to delete \'%s\'?</string>
+    <string name="dialog_button_delete">Delete</string>
+    <string name="success_task_deleted">Task \'%s\' deleted</string>
+    <string name="error_task_delete_failed_server">Failed to delete task (server error)</string>
+    <string name="error_deleting_task_prefix">Error deleting task: %s</string>
+    <string name="hint_task_title">Task Title</string>
+    <string name="hint_task_description">Description (Optional)</string>
+    <string name="validation_title_empty">Title cannot be empty</string>
+    <string name="validation_description_empty">Description cannot be empty</string>
+</resources>
