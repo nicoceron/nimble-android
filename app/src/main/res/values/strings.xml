@@ -22,4 +22,9 @@
     <string name="hint_task_description">Description (Optional)</string>
     <string name="validation_title_empty">Title cannot be empty</string>
     <string name="validation_description_empty">Description cannot be empty</string>
+    <string name="status_prefix">Status: %1$s</string>
+
+    <string name="action_start_task">Start Task</string>
+    <string name="action_complete_task">Complete Task</string>
+    <string name="action_delete_task">Delete Task</string>
 </resources>

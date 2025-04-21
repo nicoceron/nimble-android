@@ -4,19 +4,79 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".view.TaskListActivity">
+    android:background="@android:color/white"
+    tools:context=".controller.TaskListActivity">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="#1976D2"
+            app:title="My Tasks"
+            app:titleTextColor="@android:color/white"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+
+    </com.google.android.material.appbar.AppBarLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
+        <!-- RecyclerView for task list -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerViewTasks"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:paddingTop="12dp"
             android:paddingBottom="80dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:clipToPadding="false"/>
 
+        <!-- Empty state container -->
+        <LinearLayout
+            android:id="@+id/emptyStateContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="24dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:src="@android:drawable/ic_menu_agenda"
+                android:alpha="0.7"
+                android:layout_marginBottom="24dp"
+                android:contentDescription="No tasks"
+                app:tint="#1976D2" />
+
+            <TextView
+                android:id="@+id/textViewNoTasks"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No tasks found"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="#212121"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tap + to add a new task"
+                android:textSize="16sp"
+                android:textColor="#757575"
+                android:layout_marginTop="8dp"/>
+        </LinearLayout>
+
+        <!-- Progress indicator -->
         <ProgressBar
             android:id="@+id/progressBarTasks"
             style="?android:attr/progressBarStyle"
@@ -25,16 +85,9 @@
             android:layout_gravity="center"
             android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/textViewNoTasks"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="No tasks found."
-            android:layout_gravity="center"
-            android:visibility="gone"/>
-
     </FrameLayout>
 
+    <!-- Floating action button for adding tasks -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabAddTask"
         android:layout_width="wrap_content"
@@ -42,7 +95,10 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
         android:src="@android:drawable/ic_input_add"
+        app:backgroundTint="#1976D2"
+        app:tint="@android:color/white"
         app:fabSize="normal"
+        app:elevation="6dp"
         android:contentDescription="Add Task" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

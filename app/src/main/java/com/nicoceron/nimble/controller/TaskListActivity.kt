@@ -1,7 +1,7 @@
-// controller/TaskListActivity.kt
-package com.nicoceron.nimble.controller // Ensure this matches your file location
+package com.nicoceron.nimble.controller
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.*
@@ -11,10 +11,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.nicoceron.nimble.R // Ensure R is imported from your app's package
+import com.nicoceron.nimble.R
 import com.nicoceron.nimble.model.SoapRepository
 import com.nicoceron.nimble.model.Task
 import com.nicoceron.nimble.model.TaskPriority
+import com.nicoceron.nimble.model.TaskStatus // Import TaskStatus
 import kotlinx.coroutines.launch
 
 class TaskListActivity : AppCompatActivity() {
@@ -24,42 +25,49 @@ class TaskListActivity : AppCompatActivity() {
     private lateinit var progressBar: ProgressBar
     private lateinit var noTasksTextView: TextView
     private lateinit var fabAddTask: FloatingActionButton
+    private lateinit var emptyStateContainer: LinearLayout // Added reference
 
-    // CORRECT: Use Long type
     private var currentUserId: Long = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_task_list) // Ensure this layout exists
+        setContentView(R.layout.activity_task_list)
 
+        // Initialize views
         tasksRecyclerView = findViewById(R.id.recyclerViewTasks)
         progressBar = findViewById(R.id.progressBarTasks)
-        noTasksTextView = findViewById(R.id.textViewNoTasks)
+        // Correctly initialize noTasksTextView from its container
+        emptyStateContainer = findViewById(R.id.emptyStateContainer) // Find container first
+        noTasksTextView = findViewById(R.id.textViewNoTasks) // This is inside emptyStateContainer
         fabAddTask = findViewById(R.id.fabAddTask)
 
-        // CORRECT: Use Long type for getting extra and comparing
-        currentUserId = intent.getLongExtra("USER_ID", -1L) // Default value is -1L (Long)
-        if (currentUserId == -1L) { // Compare with -1L (Long)
-            // Use string resource
+        // Setup Toolbar (Optional, if you have one in your layout)
+        val toolbar: androidx.appcompat.widget.Toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
+        currentUserId = intent.getLongExtra("USER_ID", -1L)
+        if (currentUserId == -1L) {
             Toast.makeText(this, getString(R.string.error_user_id_not_found), Toast.LENGTH_LONG).show()
-            finish() // Close activity if user ID is invalid
+            finish()
             return
         }
 
         setupRecyclerView()
         loadTasks()
 
-        // Set listener for the Floating Action Button
         fabAddTask.setOnClickListener {
             showCreateTaskDialog()
         }
     }
 
     private fun setupRecyclerView() {
-        // Initialize adapter, passing the delete confirmation lambda
-        taskAdapter = TaskAdapter(mutableListOf()) { task ->
-            confirmAndDeleteTask(task)
-        }
+        // --- Pass both lambdas to the adapter ---
+        taskAdapter = TaskAdapter(
+            onDeleteClick = { task -> confirmAndDeleteTask(task) },
+            onStatusChangeClick = { task, newStatus -> updateTaskStatus(task, newStatus) }
+        )
+        // --- End of change ---
+
         tasksRecyclerView.apply {
             adapter = taskAdapter
             layoutManager = LinearLayoutManager(this@TaskListActivity)
@@ -68,110 +76,101 @@ class TaskListActivity : AppCompatActivity() {
 
     private fun loadTasks() {
         progressBar.visibility = View.VISIBLE
-        noTasksTextView.visibility = View.GONE
-        tasksRecyclerView.visibility = View.GONE
+        emptyStateContainer.visibility = View.GONE // Hide empty state
+        tasksRecyclerView.visibility = View.GONE // Hide recycler view initially
 
         lifecycleScope.launch {
-            // currentUserId is already Long
             val result = SoapRepository.getTasksForUser(currentUserId)
-            progressBar.visibility = View.GONE // Hide progress bar after call finishes
+            progressBar.visibility = View.GONE // Hide progress bar after fetch
+
             result.onSuccess { tasks ->
-                if (!tasks.isNullOrEmpty()) { // Use Kotlin's isNullOrEmpty
-                    taskAdapter.updateTasks(tasks)
-                    tasksRecyclerView.visibility = View.VISIBLE
-                    noTasksTextView.visibility = View.GONE
+                if (!tasks.isNullOrEmpty()) {
+                    // Submit list to ListAdapter
+                    taskAdapter.submitList(tasks)
+                    tasksRecyclerView.visibility = View.VISIBLE // Show recycler view
+                    emptyStateContainer.visibility = View.GONE // Keep empty state hidden
                 } else {
-                    taskAdapter.updateTasks(emptyList()) // Clear adapter
-                    tasksRecyclerView.visibility = View.GONE
-                    noTasksTextView.visibility = View.VISIBLE
-                    // Use string resource
-                    noTasksTextView.text = getString(R.string.info_no_tasks_found)
+                    taskAdapter.submitList(emptyList()) // Submit empty list
+                    tasksRecyclerView.visibility = View.GONE // Hide recycler view
+                    emptyStateContainer.visibility = View.VISIBLE // Show empty state
+                    noTasksTextView.text = getString(R.string.info_no_tasks_found) // Set text in empty state
                 }
             }.onFailure { exception ->
-                // Handle failure: show error message
-                tasksRecyclerView.visibility = View.GONE
-                noTasksTextView.visibility = View.VISIBLE
-                // Use string resource
-                noTasksTextView.text = getString(R.string.error_loading_tasks)
-                // Format error message for Toast
+                tasksRecyclerView.visibility = View.GONE // Hide recycler view
+                emptyStateContainer.visibility = View.VISIBLE // Show empty state
+                noTasksTextView.text = getString(R.string.error_loading_tasks) // Set error text
                 val errorMsg = getString(R.string.error_generic_prefix, exception.message ?: "Unknown error")
                 Toast.makeText(this@TaskListActivity, errorMsg , Toast.LENGTH_LONG).show()
-                exception.printStackTrace() // Log detailed error
+                exception.printStackTrace()
             }
         }
     }
 
+
     // --- Task Creation ---
     private fun showCreateTaskDialog() {
-        // Ensure layout file exists: res/layout/dialog_create_task.xml
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_create_task, null)
+
+        val alertDialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        // Find views in the custom layout
         val titleEditText = dialogView.findViewById<EditText>(R.id.editTextTaskTitleDialog)
         val descriptionEditText = dialogView.findViewById<EditText>(R.id.editTextTaskDescriptionDialog)
         val prioritySpinner = dialogView.findViewById<Spinner>(R.id.spinnerTaskPriorityDialog)
 
-        // CORRECT: Use Enum.entries instead of Enum.values()
-        val priorities = TaskPriority.entries.map { it.name }
+        // Setup priority spinner
+        val priorities = TaskPriority.values().map { it.name } // Use enum values directly
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, priorities)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         prioritySpinner.adapter = adapter
+        // Optionally set a default selection (e.g., MEDIUM)
+        prioritySpinner.setSelection(adapter.getPosition(TaskPriority.MEDIUM.name))
 
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.dialog_title_create_task))
-            .setView(dialogView)
-            .setPositiveButton(getString(R.string.dialog_button_create)) { dialog, _ ->
-                val title = titleEditText.text.toString().trim()
-                val description = descriptionEditText.text.toString().trim() // Get description
-                val selectedPriorityName = prioritySpinner.selectedItem as String
-                val priority = try { TaskPriority.valueOf(selectedPriorityName) } catch (e: IllegalArgumentException) { TaskPriority.MEDIUM }
 
-                // --- ADD VALIDATION FOR DESCRIPTION ---
-                if (title.isEmpty()) {
-                    // Use string resource for title validation
-                    Toast.makeText(this, getString(R.string.validation_title_empty), Toast.LENGTH_SHORT).show()
-                } else if (description.isEmpty()) { // Check if description is empty
-                    // Use string resource for description validation
-                    Toast.makeText(this, getString(R.string.validation_description_empty), Toast.LENGTH_SHORT).show()
-                }
-                // --- END OF ADDED VALIDATION ---
-                else {
-                    // Only proceed if both title and description are NOT empty
-                    // Note: description.ifEmpty { null } is no longer needed here
-                    // as we ensure description is not empty.
-                    createTask(title, description, priority)
-                    dialog.dismiss() // Dismiss dialog only on successful validation
-                }
-                // Removed dialog.dismiss() from here to prevent dismissing on validation error
+        // Set click listeners for buttons in the custom layout
+        dialogView.findViewById<Button>(R.id.buttonCancelTask).setOnClickListener {
+            alertDialog.dismiss()
+        }
+
+        dialogView.findViewById<Button>(R.id.buttonCreateTask).setOnClickListener {
+            val title = titleEditText.text.toString().trim()
+            val description = descriptionEditText.text.toString().trim()
+            val priorityString = prioritySpinner.selectedItem.toString()
+
+            // Convert the String priority to TaskPriority enum safely
+            val priority = TaskPriority.values().firstOrNull { it.name == priorityString } ?: TaskPriority.MEDIUM
+
+
+            if (title.isNotEmpty()) {
+                // Create task with these values
+                createTask(title, description, priority)
+                alertDialog.dismiss()
+            } else {
+                titleEditText.error = "Title is required"
             }
-            .setNegativeButton(getString(R.string.dialog_button_cancel)) { dialog, _ ->
-                dialog.cancel()
-            }
-            .show()
+        }
+
+        alertDialog.show()
     }
 
     private fun createTask(title: String, description: String?, priority: TaskPriority) {
-        progressBar.visibility = View.VISIBLE
+        progressBar.visibility = View.VISIBLE // Show progress
         lifecycleScope.launch {
             val result = SoapRepository.createTaskWithoutDate(currentUserId, title, description, priority)
-            progressBar.visibility = View.GONE
+            progressBar.visibility = View.GONE // Hide progress
             result.onSuccess { newTask ->
                 if (newTask?.taskId != null) {
                     Toast.makeText(this@TaskListActivity, getString(R.string.success_task_created, newTask.title ?: "Untitled"), Toast.LENGTH_SHORT).show()
+                    // Efficiently add to ListAdapter: Create a new list including the new task
+                    val currentList = taskAdapter.currentList.toMutableList()
+                    currentList.add(0, newTask) // Add to the beginning
+                    taskAdapter.submitList(currentList.toList()) // Submit an immutable copy
 
-                    // *** CHANGE THIS PART ***
-                    // Instead of reloading the whole list:
-                    // loadTasks()
-
-                    // Directly add the new task to the adapter's list:
-                    taskAdapter.addTask(newTask)
-
-                    // Optional: Scroll to the top to see the new task
-                    tasksRecyclerView.scrollToPosition(0)
-
-                    // Ensure "No tasks" text is hidden if it was visible
-                    noTasksTextView.visibility = View.GONE
-                    tasksRecyclerView.visibility = View.VISIBLE
-                    // *** END OF CHANGE ***
-
+                    tasksRecyclerView.scrollToPosition(0) // Scroll to the new task
+                    emptyStateContainer.visibility = View.GONE // Ensure empty state is hidden
+                    tasksRecyclerView.visibility = View.VISIBLE // Ensure recycler view is visible
                 } else {
                     Toast.makeText(this@TaskListActivity, getString(R.string.error_task_create_failed_null), Toast.LENGTH_LONG).show()
                 }
@@ -185,53 +184,109 @@ class TaskListActivity : AppCompatActivity() {
 
     // --- Task Deletion ---
     private fun confirmAndDeleteTask(task: Task) {
-        // CORRECT: Check task.taskId (which is Long?) against null
         if (task.taskId == null) {
-            // Use string resource
             Toast.makeText(this, getString(R.string.error_delete_invalid_id), Toast.LENGTH_SHORT).show()
-            return // Exit if ID is null
+            return
         }
-
-        // Show confirmation dialog
         AlertDialog.Builder(this)
-            // Use string resources
             .setTitle(getString(R.string.dialog_title_delete_task))
-            // Use string resource with placeholder (handle potential null title)
             .setMessage(getString(R.string.dialog_message_delete_confirm, task.title ?: "Untitled Task"))
-            .setIcon(android.R.drawable.ic_dialog_alert) // Standard warning icon
-            // Use string resource
+            .setIcon(android.R.drawable.ic_dialog_alert)
             .setPositiveButton(getString(R.string.dialog_button_delete)) { dialog, _ ->
-                // Call deleteTask only if user confirms
                 deleteTask(task)
-                dialog.dismiss() // Dismiss dialog
+                dialog.dismiss()
             }
-            // Use string resource
-            .setNegativeButton(getString(R.string.dialog_button_cancel), null) // No action on cancel, just dismiss
+            .setNegativeButton(getString(R.string.dialog_button_cancel), null)
             .show()
     }
 
     private fun deleteTask(task: Task) {
+        val taskIdToDelete = task.taskId ?: run {
+            Toast.makeText(this, getString(R.string.error_delete_invalid_id), Toast.LENGTH_SHORT).show()
+            return // Exit if taskId is null
+        }
+
+        progressBar.visibility = View.VISIBLE // Show progress
         lifecycleScope.launch {
-            // CORRECT: Ensure taskId is non-null and explicitly use Long type
-            val taskId: Long = task.taskId ?: return@launch // Exit coroutine if taskId is null
-            // taskId is now guaranteed non-null and is Long
-            val result = SoapRepository.deleteTask(taskId) // Pass the Long taskId
+            val result = SoapRepository.deleteTask(taskIdToDelete)
+            progressBar.visibility = View.GONE // Hide progress
 
             result.onSuccess { success ->
                 if (success) {
-                    // Use string resource with placeholder
                     Toast.makeText(this@TaskListActivity, getString(R.string.success_task_deleted, task.title ?: "Untitled Task"), Toast.LENGTH_SHORT).show()
-                    loadTasks() // Reload list to reflect deletion
+
+                    // Efficiently remove from ListAdapter
+                    val currentList = taskAdapter.currentList.toMutableList()
+                    val removed = currentList.removeAll { it.taskId == taskIdToDelete }
+                    if (removed) {
+                        taskAdapter.submitList(currentList.toList()) // Submit immutable copy
+                    }
+
+                    // Show "No tasks" if the list becomes empty
+                    if (currentList.isEmpty()) {
+                        emptyStateContainer.visibility = View.VISIBLE
+                        tasksRecyclerView.visibility = View.GONE
+                    } else {
+                        emptyStateContainer.visibility = View.GONE
+                        tasksRecyclerView.visibility = View.VISIBLE
+                    }
+
                 } else {
-                    // Use string resource
                     Toast.makeText(this@TaskListActivity, getString(R.string.error_task_delete_failed_server), Toast.LENGTH_LONG).show()
                 }
             }.onFailure { exception ->
-                // Use string resource with placeholder
                 val errorMsg = getString(R.string.error_deleting_task_prefix, exception.message ?: "Unknown error")
                 Toast.makeText(this@TaskListActivity, errorMsg, Toast.LENGTH_LONG).show()
-                exception.printStackTrace() // Log detailed error
+                exception.printStackTrace()
             }
         }
     }
+
+
+    // --- Function to handle Task Status Update ---
+    private fun updateTaskStatus(task: Task, newStatus: TaskStatus) {
+        val taskIdToUpdate = task.taskId ?: run {
+            Toast.makeText(this, "Cannot update task without ID", Toast.LENGTH_SHORT).show()
+            return // Exit if taskId is null
+        }
+
+        progressBar.visibility = View.VISIBLE // Show progress indicator
+        lifecycleScope.launch {
+            // Pass the original task object and the desired new status
+            val result = SoapRepository.updateTask(task, newStatus)
+            progressBar.visibility = View.GONE // Hide progress indicator
+
+            result.onSuccess { updatedTaskFromServer ->
+                // Check if the update was successful and we got back an updated task
+                if (updatedTaskFromServer?.taskId != null) {
+                    Toast.makeText(this@TaskListActivity, "Task '${updatedTaskFromServer.title}' status updated to ${updatedTaskFromServer.status?.name}", Toast.LENGTH_SHORT).show()
+
+                    // Efficiently update ListAdapter
+                    val currentList = taskAdapter.currentList.toMutableList()
+                    val index = currentList.indexOfFirst { it.taskId == taskIdToUpdate }
+                    if (index != -1) {
+                        // Replace the old task with the updated one from the server
+                        currentList[index] = updatedTaskFromServer
+                        taskAdapter.submitList(currentList.toList()) // Submit immutable copy
+                    } else {
+                        // Task wasn't found in the current list? This shouldn't ideally happen.
+                        // As a fallback, reload the whole list.
+                        Log.w("TaskListActivity", "Task with ID $taskIdToUpdate not found in adapter after update. Reloading list.")
+                        loadTasks()
+                    }
+
+                } else {
+                    // The server indicated failure or returned null
+                    Toast.makeText(this@TaskListActivity, "Failed to update task status on server.", Toast.LENGTH_LONG).show()
+                    // Optional: Consider reverting the UI change if the update failed decisively
+                    // You might need to fetch the original task state again or handle this based on API response.
+                }
+            }.onFailure { exception ->
+                Toast.makeText(this@TaskListActivity, "Error updating task: ${exception.message}", Toast.LENGTH_LONG).show()
+                exception.printStackTrace()
+                // Optional: Revert UI change on network/SOAP error too
+            }
+        }
+    }
+
 }

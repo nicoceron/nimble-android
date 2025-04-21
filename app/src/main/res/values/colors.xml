@@ -1,5 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <color name="colorPrimary">#1976D2</color>
+    <color name="colorPrimaryDark">#1565C0</color>
+    <color name="colorAccent">#FF4081</color>
+
+    <!-- Text colors -->
+    <color name="textPrimary">#212121</color>
+    <color name="textSecondary">#757575</color>
+
+    <!-- Task priority colors -->
+    <color name="priorityHigh">#F44336</color>
+    <color name="priorityMedium">#FF9800</color>
+    <color name="priorityLow">#4CAF50</color>
+
+    <!-- Task status colors -->
+    <color name="statusTodo">#757575</color>
+    <color name="statusInProgress">#1976D2</color>
+    <color name="statusCompleted">#4CAF50</color>
+
+    <!-- Background colors -->
+    <color name="background">#FFFFFF</color>
+    <color name="backgroundLight">#F5F5F5</color>
+    <color name="divider">#E0E0E0</color>
 </resources>
